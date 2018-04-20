@@ -5,6 +5,10 @@ class mstn_train_net(base):
     def __int__(self):
         pass
 
+    #
+    # def setup(self):
+    #     (self.feed('data').conv())
+    #
     def setup(self):
         # 详细查询vgg16的参数
         (self.feed('data')
@@ -25,19 +29,24 @@ class mstn_train_net(base):
          .conv(3, 3, 512, 1, 1, name='conv5_1')
          .conv(3, 3, 512, 1, 1, name='conv5_2')
          .conv(3, 3, 512, 1, 1, name='conv5_3')
-         .max_pool(2, 2, 2, 2, padding='VALID', name='pool5'))
-
+        # TODO 郭义 论文SSD 3 Base network
+        #  .max_pool(2, 2, 2, 2, padding='VALID', name='pool5'))
+         .max_pool(3, 3, 1, 1, padding='VALID', name='pool5'))
         ############# 以上为VGG16前五层 ####################################
-
         '''
          after conv5 follow by conv6 conv7 conv8 conv9 conv10 conv11
         '''
-        # TODO 确定这些卷积核的大小 通道数 和池化层
-        (self.conv(3, 3, 1024, 1, 1, name='conv6_1')
+        # 下面的参数全部来自于SSD，具体参数可见 SSD fig.2 以及链接https://github.com/rykov8/ssd_keras/blob/master/ssd.py
+        (self.atrous_conv(3,3,1024, 2, name="fc6")
+         .conv(1, 1, 1024, 1, 1, name="fc7")
+        ############### 以上为SSD中的基本层，下面的为附加层#################
+         .conv(3, 3, 1024, 1, 1, name='conv6_1')
          .conv(3, 3, 1024, 1, 1, name='conv6_2')
          # TODO 根据论文 conv6 和conv7之间没有池化层
          .conv(3, 3, 1024, 1, 1, name='conv7_1')
          .conv(3, 3, 1024, 1, 1, name='conv7_2')
+
+
          .max_pool(2, 2, 2, 2, padding='VALID', name='pool7')
          .conv(3, 3, 1024, 1, 1, name='conv8_1')
          .conv(3, 3, 1024, 1, 1, name='conv8_2')

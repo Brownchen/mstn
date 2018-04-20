@@ -141,13 +141,19 @@ class BaseNetwork(object):
          .batch_normalize(name=name + '_deconv_output'))
 
         (self.feed(feature_layer)
-         .conv(3, 3, 1024, 1, 1, name=name + '_conv2')
+        # TODO 郭义
+         .conv(3, 3, 512, 1, 1, name=name + '_conv2')
+         # .conv(3, 3, 1024, 1, 1, name=name + '_conv2')
          .batch_normalize().relu()
-         .conv(3, 3, 1024, 1, 1, name=name + 'conv3')
+        # TODO guoyi
+        #  .conv(3, 3, 1024, 1, 1, name=name + 'conv3')
+         .conv(3, 3, 512, 1, 1, name=name + 'conv3')
          .batch_normalize(name=name + '_feature'))
 
-        return tf.multiply(self.get_output(name + '_deconv_output'), self.get_output(name + '_feature'))\
-            .relu(name=name)
+        mat_deconv = self.get_output(name + '_deconv_output')
+        mat_feature = self.get_output(name + '_feature')
+        assert mat_feature.get_shape() == mat_deconv.get_shape(), "The shape of two matrix to element-wise must be same"
+        return tf.multiply(mat_deconv, mat_feature).relu(name=name)
 
 
 
@@ -195,8 +201,10 @@ class BaseNetwork(object):
 
     @layer
     def batch_normalize(self, input, training=True):
-        axis = -1
-        return tf.layer.batch_normalization(input, axis=axis, training=training)
+        # TODO 郭义
+        # axis = -1
+        axis = 0
+        return tf.layers.batch_normalization(input, axis=axis, training=training)
 
 
 
@@ -256,6 +264,36 @@ class BaseNetwork(object):
                 if relu:
                     return tf.nn.relu(conv, name=scope.name)
                 return conv
+    @layer
+    def atrous_conv(self, input, k_h, k_w, c_o,rate, name, biased=True, relu=True, padding=DEFAULT_PADDING,
+             trainable=True):
+        """ contribution by miraclebiu, and biased option"""
+        self.validate_padding(padding)
+        c_i = input.get_shape()[-1]
+        atrous_convolve = lambda i, k: tf.nn.atrous_conv2d(i, k, rate=rate, padding=padding)
+        with tf.variable_scope(name) as scope:
+
+            init_weights = tf.truncated_normal_initializer(0.0, stddev=0.01)
+            init_biases = tf.constant_initializer(0.0)
+            kernel = self.make_var('weights', [k_h, k_w, c_i, c_o], init_weights, trainable, \
+                                   regularizer=self.l2_regularizer(cfg.TRAIN.WEIGHT_DECAY))
+            if biased:
+                biases = self.make_var('biases', [c_o], init_biases, trainable)
+                conv = atrous_convolve(input, kernel)
+                if relu:
+                    bias = tf.nn.bias_add(conv, biases)
+                    return tf.nn.relu(bias, name=scope.name)
+                return tf.nn.bias_add(conv, biases, name=scope.name)
+            else:
+                conv = atrous_convolve(input, kernel)
+                if relu:
+                    return tf.nn.relu(conv, name=scope.name)
+                return conv
+
+
+
+
+
 
     @layer
     def relu(self, input, name):
